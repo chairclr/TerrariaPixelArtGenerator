@@ -21,4 +21,8 @@
     </Content>
   </ItemGroup>
 
+  <ItemGroup>
+    <Content Update="Assets\TileData\TileTextures.png" Link="Assets\TileData\TileTextures.png" />
+  </ItemGroup>
+
 </Project>

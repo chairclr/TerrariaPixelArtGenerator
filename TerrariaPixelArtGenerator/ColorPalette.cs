@@ -15,7 +15,8 @@ public class ColorPalette
 
     public void Load(ReadOnlySpan<uint> tileWall, ReadOnlySpan<byte> paint)
     {
-
+        tileWall.CopyTo(TileWallPalette);
+        paint.CopyTo(PaintPalette);
     }
 
     public (ushort, ushort, byte) GetValuesFromPalette(int r, int g, int b)
