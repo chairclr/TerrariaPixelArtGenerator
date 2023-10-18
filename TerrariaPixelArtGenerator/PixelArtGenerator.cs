@@ -1,4 +1,5 @@
-﻿using System.Numerics;
+﻿using System.Diagnostics.CodeAnalysis;
+using System.Numerics;
 using System.Runtime.InteropServices;
 using ImGuiNET;
 using plane;
@@ -7,6 +8,7 @@ using plane.Graphics.Buffers;
 using plane.Graphics.Shaders;
 using Silk.NET.Direct3D11;
 using Silk.NET.DXGI;
+using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.PixelFormats;
 using TerrariaPixelArtGenerator;
 using TerrariaPixelArtGenerator.ID;
@@ -50,6 +52,14 @@ public class GeneratorPlane : Plane
     private string PaletteEditorSearch = "";
 
     private string ImagePath = "";
+
+    private int TileWidth = 256;
+
+    private int TileHeight = 256;
+
+    private bool MaintainAspectRatio = true;
+
+    private Image<Rgba32>? Image;
 
     public GeneratorPlane(string windowName)
         : base(windowName)
@@ -133,7 +143,29 @@ public class GeneratorPlane : Plane
 
                 if (ImGui.Button("Generate Pixel Art"))
                 {
-                    Console.WriteLine($"Image Path: {ImagePath}");
+                    if (File.Exists(ImagePath) && TryLoad(ImagePath, out Image))
+                    {
+                        TryGeneratePalette();
+
+                        CheckSizeWidth();
+                    }
+                }
+
+                if (ImGui.SliderInt("Width", ref TileWidth, 1, 2048))
+                {
+                    CheckSizeWidth();
+                }
+
+                if (ImGui.SliderInt("Height", ref TileHeight, 1, 2048))
+                {
+                    CheckSizeHeight();
+                }
+
+                if (ImGui.BeginChild("ViewWindow"))
+                {
+
+
+                    ImGui.EndChild();
                 }
 
                 ImGui.EndTabItem();
@@ -257,6 +289,54 @@ public class GeneratorPlane : Plane
         }
 
         return (validTiles, validWalls);
+    }
+
+    private static bool TryLoad(string path, [NotNullWhen(true)] out Image<Rgba32>? image)
+    {
+        image = null;
+
+        try
+        {
+            image = Image.Load<Rgba32>(path);
+
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    public void CheckSizeWidth()
+    {
+        if (MaintainAspectRatio)
+        {
+            if (Image == null)
+            {
+                TileHeight = TileWidth;
+            }
+            else
+            {
+                float ratio = (float)Image.Height / (float)Image.Width;
+                TileHeight = (int)((float)TileWidth * ratio);
+            }
+        }
+    }
+
+    public void CheckSizeHeight()
+    {
+        if (MaintainAspectRatio)
+        {
+            if (Image == null)
+            {
+                TileWidth = TileHeight;
+            }
+            else
+            {
+                float ratio = (float)Image.Width / (float)Image.Height;
+                TileWidth = (int)((float)TileHeight * ratio);
+            }
+        }
     }
 }
 
