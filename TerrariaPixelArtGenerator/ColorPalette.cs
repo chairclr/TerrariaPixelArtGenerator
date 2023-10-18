@@ -1,5 +1,4 @@
-﻿using System.Runtime.CompilerServices;
-using SixLabors.ImageSharp.PixelFormats;
+﻿using SixLabors.ImageSharp.PixelFormats;
 
 namespace TerrariaPixelArtGenerator;
 

@@ -1,6 +1,4 @@
-﻿using System.Reflection;
-
-namespace TerrariaPixelArtGenerator.ID;
+﻿namespace TerrariaPixelArtGenerator.ID;
 
 internal class TileID
 {
