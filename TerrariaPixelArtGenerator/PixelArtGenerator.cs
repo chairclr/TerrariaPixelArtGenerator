@@ -49,6 +49,8 @@ public class GeneratorPlane : Plane
 
     private string PaletteEditorSearch = "";
 
+    private string ImagePath = "";
+
     public GeneratorPlane(string windowName)
         : base(windowName)
     {
@@ -127,6 +129,13 @@ public class GeneratorPlane : Plane
         {
             if (ImGui.BeginTabItem("View"))
             {
+                ImGui.InputText("Source Image Path", ref ImagePath, 2048);
+
+                if (ImGui.Button("Generate Pixel Art"))
+                {
+                    Console.WriteLine($"Image Path: {ImagePath}");
+                }
+
                 ImGui.EndTabItem();
             }
 
