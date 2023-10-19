@@ -2,7 +2,7 @@
 
 internal class TileID
 {
-    public static readonly string[] Names = typeof(TileID).GetFields().Skip(1).Select(x => x.Name).ToArray();
+    public static readonly string[] Names = typeof(TileID).GetFields().Skip(2).Select(x => x.Name).ToArray();
 
     public const ushort Dirt = 0;
 

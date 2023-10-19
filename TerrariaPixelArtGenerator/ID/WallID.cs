@@ -2,7 +2,7 @@
 
 internal class WallID
 {
-    public static readonly string[] Names = typeof(WallID).GetFields().Skip(1).Select(x => x.Name).ToArray();
+    public static readonly string[] Names = typeof(WallID).GetFields().Skip(2).Select(x => x.Name).ToArray();
 
     public const ushort None = 0;
 

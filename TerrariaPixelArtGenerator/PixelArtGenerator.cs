@@ -24,6 +24,7 @@ public class GeneratorPlane : Plane
 
     public Vector4[]? TileColors;
     public Vector4[]? WallColors;
+    public Vector4[]? PaintColors;
 
     public ShaderResourceBuffer<Vector4>? TileColorBuffer;
 
@@ -102,8 +103,8 @@ public class GeneratorPlane : Plane
         WallColors = new Vector4[tileColorReader.ReadInt32()];
         tileColorReader.Read(MemoryMarshal.AsBytes(WallColors.AsSpan()));
 
-        Vector4[] paintColors = new Vector4[tileColorReader.ReadInt32()];
-        tileColorReader.Read(MemoryMarshal.AsBytes(paintColors.AsSpan()));
+        PaintColors = new Vector4[tileColorReader.ReadInt32()];
+        tileColorReader.Read(MemoryMarshal.AsBytes(PaintColors.AsSpan()));
 
         {
             using FileStream validTileFileStream = new FileStream(Path.Combine(path, "Assets", "TileData", "validTileWallInfo.bin"), FileMode.Open);
@@ -137,7 +138,7 @@ public class GeneratorPlane : Plane
 
         TileColorBuffer = new ShaderResourceBuffer<Vector4>(Renderer!, TileColors, Format.FormatR32G32B32A32Float);
         WallColorBuffer = new ShaderResourceBuffer<Vector4>(Renderer!, WallColors, Format.FormatR32G32B32A32Float);
-        PaintColorBuffer = new ShaderResourceBuffer<Vector4>(Renderer!, paintColors, Format.FormatR32G32B32A32Float);
+        PaintColorBuffer = new ShaderResourceBuffer<Vector4>(Renderer!, PaintColors, Format.FormatR32G32B32A32Float);
 
         TilesForPixelArtBuffer = new ShaderResourceBuffer<int>(Renderer!, tilesForPixelArt, Format.FormatR32Uint);
         WallsForPixelArtBuffer = new ShaderResourceBuffer<int>(Renderer!, wallsForPixelArt, Format.FormatR32Uint);
@@ -175,6 +176,13 @@ public class GeneratorPlane : Plane
                     }
                 }
 
+                if (PaletteNeedsUpdate && CurrentResult is not null)
+                {
+                    ImGui.SameLine();
+
+                    ImGui.Text("* Palette has been changed");
+                }
+
                 if (ImGui.SliderInt("Width", ref TileWidth, 1, 2048))
                 {
                     CheckSizeWidth();
@@ -194,11 +202,29 @@ public class GeneratorPlane : Plane
 
                     ImGuiIOPtr io = ImGui.GetIO();
 
+                    Vector2 mousePos = io.MousePos;
+
+                    // Imgui will randomly just report really really high or NaN mouse values
+                    // No idea why, its really annoying
+                    // Just a bandaid solution
+                    if (float.IsNaN(mousePos.X) || float.IsNaN(mousePos.Y) || float.IsInfinity(mousePos.X * 2) || float.IsInfinity(mousePos.Y * 2))
+                    {
+                        mousePos = Vector2.Zero;
+                    }
+
+                    // lol
+                    if (float.IsNaN(ViewScale.X + ViewOffset.X) || float.IsNaN(ViewScale.Y + ViewOffset.Y) || float.IsInfinity(ViewScale.X + ViewOffset.X) || float.IsInfinity(ViewScale.Y + ViewOffset.Y))
+                    {
+                        ViewScale = Vector2.One;
+                        ViewOffset = Vector2.Zero;
+                    }
+
+                    // More lol
                     bool inWindow = new Rectangle((int)windowMin.X, (int)windowMin.Y, (int)(windowMax.X - windowMin.X), (int)(windowMax.Y - windowMin.Y)).Contains((int)io.MousePos.X, (int)io.MousePos.Y);
 
                     if (!io.AppFocusLost)
                     {
-                        Vector2 originalScaledMouse = io.MousePos / ViewScale;
+                        Vector2 originalScaledMouse = mousePos / ViewScale;
 
                         if (inWindow)
                         {
@@ -206,7 +232,7 @@ public class GeneratorPlane : Plane
                             ViewScale = Vector2.Clamp(ViewScale, new Vector2(0.01f, 0.01f), new Vector2(20f, 20f));
                         }
 
-                        Vector2 currentScaledMouse = io.MousePos / ViewScale;
+                        Vector2 currentScaledMouse = mousePos / ViewScale;
 
                         // Zoom in on where the mouse is
                         ViewOffset += originalScaledMouse - currentScaledMouse;
@@ -215,7 +241,7 @@ public class GeneratorPlane : Plane
                         {
                             if (ImGui.IsMouseClicked(ImGuiMouseButton.Left))
                             {
-                                MouseTranslateOrigin = io.MousePos / ViewScale + ViewOffset;
+                                MouseTranslateOrigin = mousePos / ViewScale + ViewOffset;
 
                                 Panning = true;
                             }
@@ -225,7 +251,7 @@ public class GeneratorPlane : Plane
                         {
                             if (Panning)
                             {
-                                Vector2 currentMousePosition = io.MousePos / ViewScale + ViewOffset;
+                                Vector2 currentMousePosition = mousePos / ViewScale + ViewOffset;
 
                                 ViewOffset += MouseTranslateOrigin - currentMousePosition;
                             }
@@ -235,13 +261,44 @@ public class GeneratorPlane : Plane
                             Panning = false;
                         }
                     }
-
+                    else
+                    {
+                        Panning = false;
+                    }
 
                     Matrix4x4 matrix = ViewMatrix;
 
                     foreach (ImageSection section in RenderedSections)
                     {
                         drawList.AddImage(section.TextureId, Vector2.Transform(section.Position, matrix), Vector2.Transform(section.Position + section.Size, matrix));
+                    }
+
+                    if (Matrix4x4.Invert(matrix, out Matrix4x4 inverse))
+                    {
+                        Vector2 mouseTilePost = Vector2.Transform(io.MousePos, inverse) / 16;
+
+                        int x = (int)mouseTilePost.X;
+                        int y = (int)mouseTilePost.Y;
+
+                        if (CurrentResult is not null && x >= 0 && y >= 0 && x < CurrentResult.Width && y < CurrentResult.Height)
+                        {
+                            ImGui.BeginTooltip();
+
+                            ImGui.Text($"Tile {CurrentResult.Tiles[x, y]} / {TileID.Names[CurrentResult.Tiles[x, y]]}");
+
+                            int paint = CurrentResult.Paints[x, y];
+
+                            if (paint == 0)
+                            {
+                                ImGui.Text("No paint");
+                            }
+                            else
+                            {
+                                ImGui.Text($"{PaintID.Names[paint]}");
+                            }
+
+                            ImGui.EndTooltip();
+                        }
                     }
 
                     ImGui.EndChild();
@@ -265,7 +322,10 @@ public class GeneratorPlane : Plane
                         if (!searchEmpty && !TileID.Names[i].ToLower().Contains(PaletteEditorSearch.ToLower()))
                             continue;
 
-                        ImGui.Checkbox($"       {TileID.Names[i]}", ref IsTileValid[i]);
+                        if (ImGui.Checkbox($"       {TileID.Names[i]}", ref IsTileValid[i]))
+                        {
+                            PaletteNeedsUpdate = true;
+                        }
 
                         Vector2 min = ImGui.GetItemRectMin();
                         Vector2 max = ImGui.GetItemRectMax();
@@ -278,7 +338,10 @@ public class GeneratorPlane : Plane
                         if (!searchEmpty && !WallID.Names[i].ToLower().Contains(PaletteEditorSearch.ToLower()))
                             continue;
 
-                        ImGui.Checkbox($"       {WallID.Names[i]}", ref IsWallValid[i]);
+                        if (ImGui.Checkbox($"       {WallID.Names[i]}", ref IsWallValid[i]))
+                        {
+                            PaletteNeedsUpdate = true;
+                        }
 
                         Vector2 min = ImGui.GetItemRectMin();
                         Vector2 max = ImGui.GetItemRectMax();
@@ -506,6 +569,7 @@ public class GeneratorPlane : Plane
             for (int y = startY; y < Math.Min(startY + tileHeight, result.Height); y++)
             {
                 ushort tileType = result.Tiles[x, y];
+                byte paint = result.Paints[x, y];
 
                 if (tileType == ushort.MaxValue)
                 {
@@ -522,13 +586,51 @@ public class GeneratorPlane : Plane
                 {
                     for (int w = 0; w < 16; w++)
                     {
-                        image[rx * 16 + z, ry * 16 + w] = TileTextures![z + ix, w + iy];
+                        image[rx * 16 + z, ry * 16 + w] = ApplyTilePaint(TileTextures![z + ix, w + iy].ToVector4(), paint);
                     }
                 }
             }
         }
 
         return new Texture2D(Renderer!, image);
+    }
+
+    private Rgba32 ApplyTilePaint(Vector4 originalTileColor, int paint)
+    {
+        Vector4 paintColor = PaintColors![paint];
+
+        Vector4 tileColor = originalTileColor;
+        Vector4 tileColorCopy = tileColor;
+
+        if (tileColorCopy.Z > tileColorCopy.X)
+        {
+            tileColorCopy.X = tileColorCopy.Z;
+        }
+
+        if (tileColorCopy.Y > tileColorCopy.X)
+        {
+            float temp = tileColorCopy.X;
+            tileColorCopy.X = tileColorCopy.Y;
+            tileColorCopy.Y = temp;
+        }
+
+        switch (paint)
+        {
+            case 0:
+            case 31:
+                break;
+            case 29:
+                tileColor = paintColor * tileColorCopy.Y * 0.3f;
+                break;
+            case 30:
+                tileColor = Vector4.One - tileColor;
+                break;
+            default:
+                tileColor = paintColor * tileColorCopy.X;
+                break;
+        }
+
+        return new Rgba32(new Vector4(tileColor.X, tileColor.Y, tileColor.Z, originalTileColor.W));
     }
 }
 

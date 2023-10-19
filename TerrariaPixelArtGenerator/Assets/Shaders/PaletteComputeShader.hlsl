@@ -113,21 +113,8 @@ void GetInfoFromColor(float4 color, out uint tileType, out uint wallType, out ui
     for (int i = 0; i < TilesForPixelArtLength; i++)
     {
         uint tileType = TilesForPixelArt[i];
-
-        float4 tileColor = GetTileColor(tileType, 0);
         
-        if (tileColor.a == 0.0)
-            continue;
-        
-        float d = distance(tileColor.xyz, color.xyz);
-        
-        if (d < minDist)
-        {
-            minDist = d;
-            minTile = tileType;
-            minPaint = -1;
-        }
-        /*for (int j = 0; j < 13; j++)
+        for (int j = 0; j < 13; j++)
         {
             float4 tileColor = GetTileColor(tileType, j);
             
@@ -159,7 +146,7 @@ void GetInfoFromColor(float4 color, out uint tileType, out uint wallType, out ui
                 minTile = tileType;
                 minPaint = k;
             }
-        }*/
+        }
     }
     
     for (int l = 0; l < WallsForPixelArtLength; l++)
